@@ -2,18 +2,72 @@
 
 import os
 from flask import Flask, jsonify
-import sqlalchemy
+from flask_sqlalchemy import SQLAlchemy
+import datetime
+
+RATE_PER_MINUTE = 3
+MINUTE_TIME_DELTA = datetime.timedelta(seconds=10)
+request_amounts = 0
+previous_time = datetime.datetime.utcnow()
 
 # web app
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQL_URI')
+db = SQLAlchemy(app)
+
 
 # database engine
-engine = sqlalchemy.create_engine(os.getenv('SQL_URI'))
+
+'''
+Implement rate-limiting on all of the API endpoint
+
+endpoints:
+  /
+  /events/hourly
+  /events/daily
+  /stats/hourly
+  /stats/daily
+  /poi 
+'''
+'''
+PLAN:
+[x] default rate limit: (n requests) per minute (globally)
+[ ] default rate limit: (n requests) per minute (PER IP Address)
+[ ] default rate limit: (n requests) per minute (PER IP Address, Per Route)
+'''
+
+
+@app.before_request
+def before_request():
+    global previous_time
+    global request_amounts
+    right_now = datetime.datetime.utcnow()
+
+    if right_now - previous_time > MINUTE_TIME_DELTA:
+        previous_time = right_now
+        request_amounts = 0
+
+    if not (request_amounts < RATE_PER_MINUTE and right_now - previous_time < MINUTE_TIME_DELTA):
+        return format_error_message(), 404
+    request_amounts += 1
+
+
+def format_error_message():
+    return f'''<h1>You have exceded your limit. You can only make {RATE_PER_MINUTE} per {MINUTE_TIME_DELTA}</h1>
+  <h2>You have {MINUTE_TIME_DELTA - (datetime.datetime.utcnow() - previous_time)} left</h2>'''
 
 
 @app.route('/')
 def index():
-    return 'Welcome to EQ Works 😎'
+
+    global previous_time
+    global request_amounts
+    right_now = datetime.datetime.utcnow()
+
+    resp = 'Welcome to EQ Works 😎'
+    resp += f'<h1>{request_amounts} time passed {right_now - previous_time}<h1>'
+
+    return resp
 
 
 @app.route('/events/hourly')
@@ -60,6 +114,7 @@ def stats_daily():
         LIMIT 7;
     ''')
 
+
 @app.route('/poi')
 def poi():
     return queryHelper('''
@@ -67,7 +122,7 @@ def poi():
         FROM public.poi;
     ''')
 
+
 def queryHelper(query):
-    with engine.connect() as conn:
-        result = conn.execute(query).fetchall()
-        return jsonify([dict(row.items()) for row in result])
+    result = db.engine.execute(query).fetchall()
+    return jsonify([dict(row.items()) for row in result])

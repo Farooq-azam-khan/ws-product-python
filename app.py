@@ -17,8 +17,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
-# database engine
-
 '''
 Implement rate-limiting on all of the API endpoint
 

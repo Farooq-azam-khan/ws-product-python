@@ -13,6 +13,7 @@ previous_time = datetime.datetime.utcnow()
 # web app
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQL_URI')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
@@ -28,12 +29,6 @@ endpoints:
   /stats/hourly
   /stats/daily
   /poi 
-'''
-'''
-PLAN:
-[x] default rate limit: (n requests) per minute (globally)
-[ ] default rate limit: (n requests) per minute (PER IP Address)
-[ ] default rate limit: (n requests) per minute (PER IP Address, Per Route)
 '''
 
 
@@ -53,8 +48,10 @@ def before_request():
 
 
 def format_error_message():
-    return f'''<h1>You have exceded your limit. You can only make {RATE_PER_MINUTE} per {MINUTE_TIME_DELTA}</h1>
-  <h2>You have {MINUTE_TIME_DELTA - (datetime.datetime.utcnow() - previous_time)} left</h2>'''
+    error_type = f'''rate limiting error'''
+    error_message = f'''You have exceded your limit. You can only make {RATE_PER_MINUTE} per {MINUTE_TIME_DELTA}'''
+
+    return jsonify({'success': False, 'error': error_type, 'message': error_message})
 
 
 @app.route('/')
